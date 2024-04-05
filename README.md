@@ -30,3 +30,12 @@
 - The color palette is randomly generated for each run.
 - The maximum number of iterations for the fractal calculation is set to 70 by default.
 - The render scale determines the block size for rendering pixels and is set to 2 by default.
+
+  
+
+### ![mandlebrot](https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/8e600ced-4bfd-4076-8755-b94f0dc0c944)
+
+### <img width="1199" alt="Screenshot 2024-04-05 at 11 11 58 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/b440f304-7579-4c04-b09e-1fc29aeddd00">
+
+### <img width="1200" alt="Screenshot 2024-04-05 at 10 42 25 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/f354e238-3030-4d91-9851-65333786a519">
+
