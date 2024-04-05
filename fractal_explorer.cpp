@@ -4,11 +4,14 @@
 #include <cstdint>
 #include <random>
 #include </opt/homebrew/include/SDL2/SDL.h>
+#include <future>
+#include <thread>
+#include <vector>
 
 const int WIDTH = 1200;
 const int HEIGHT = 1000;
-const int MAX_ITERATIONS = 70;
-const double RENDER_SCALE = 1;
+const int MAX_ITERATIONS = 100;
+const double RENDER_SCALE = 2;
 
 using Complex = std::complex<double>;
 
@@ -54,63 +57,183 @@ uint32_t getColor(int iterations, const std::vector<uint32_t>& colorPalette) {
     return (255 << 24) | (r << 16) | (g << 8) | b;
 }
 
-void julia(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, int resolution, const std::vector<uint32_t>& colorPalette) {
-    Complex c(-0.8, 0.156);  // Julia set parameter
+// void julia(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, int resolution, const std::vector<uint32_t>& colorPalette) {
+//     Complex c(-0.8, 0.156);  // Julia set parameter
 
-    #pragma omp parallel for
-    for (int y = startY; y < endY; y += RENDER_SCALE) {
-        for (int x = startX; x < endX; x += RENDER_SCALE) {
-            if (x >= 0 && x < width && y >= 0 && y < height) {
-                double zx = ((double)x - resolution / 2) * scale + centerX;
-                double zy = ((double)y - resolution / 2) * scale + centerY;
-                Complex z(zx, zy);
-                int iterations = 0;
-                double potential = 0.0;
+//     #pragma omp parallel for
+//     for (int y = startY; y < endY; y += RENDER_SCALE) {
+//         for (int x = startX; x < endX; x += RENDER_SCALE) {
+//             if (x >= 0 && x < width && y >= 0 && y < height) {
+//                 double zx = ((double)x - resolution / 2) * scale + centerX;
+//                 double zy = ((double)y - resolution / 2) * scale + centerY;
+//                 Complex z(zx, zy);
+//                 int iterations = 0;
+//                 double potential = 0.0;
 
-                while (std::abs(z) < 10 && iterations < MAX_ITERATIONS) {
-                    z = z * z + c;
-                    potential = std::log(std::log(std::abs(z))) / std::log(2.0);
-                    ++iterations;
-                }
+//                 while (std::abs(z) < 10 && iterations < MAX_ITERATIONS) {
+//                     z = z * z + c;
+//                     potential = std::log(std::log(std::abs(z))) / std::log(2.0);
+//                     ++iterations;
+//                 }
 
-                uint32_t color;
-                if (iterations == MAX_ITERATIONS) {
-                    color = 0x000000;  // Black color for points inside the set
-                } else {
-                    color = getColor(static_cast<int>(potential * MAX_ITERATIONS), colorPalette);
-                }
+//                 uint32_t color;
+//                 if (iterations == MAX_ITERATIONS) {
+//                     color = getColor(static_cast<int>(potential * MAX_ITERATIONS), colorPalette);  // Black color for points inside the set
+//                 } else {
+//                     color = getColor(static_cast<int>(potential * MAX_ITERATIONS), colorPalette);
+//                 }
 
-                // Fill the scaled pixel block
-                for (int i = 0; i < RENDER_SCALE; ++i) {
-                    for (int j = 0; j < RENDER_SCALE; ++j) {
-                        int pixelX = x + j;
-                        int pixelY = y + i;
-                        if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
-                            pixels[pixelY * width + pixelX] = color;
+//                 // Fill the scaled pixel block
+//                 for (int i = 0; i < RENDER_SCALE; ++i) {
+//                     for (int j = 0; j < RENDER_SCALE; ++j) {
+//                         int pixelX = x + j;
+//                         int pixelY = y + i;
+//                         if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+//                             pixels[pixelY * width + pixelX] = color;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// void mandelbrot(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, const std::vector<uint32_t>& colorPalette) {
+//     int resolution = calculateResolution(scale);
+
+//     #pragma omp parallel for
+//     for (int y = startY; y < endY; y += RENDER_SCALE) {
+//         for (int x = startX; x < endX; x += RENDER_SCALE) {
+//             if (x >= 0 && x < width && y >= 0 && y < height) {
+//                 double zx = ((double)x - resolution / 2) * scale + centerX;
+//                 double zy = ((double)y - resolution / 2) * scale + centerY;
+//                 Complex c(zx, zy);
+//                 Complex z(0, 0);
+//                 int iterations = 0;
+//                 while (std::abs(z) < 8 && iterations < MAX_ITERATIONS) {
+//                     z = z * z + c;
+//                     ++iterations;
+//                 }
+
+//                 uint32_t color = getColor(iterations, colorPalette);
+
+//                 // Fill the scaled pixel block
+//                 for (int i = 0; i < RENDER_SCALE; ++i) {
+//                     for (int j = 0; j < RENDER_SCALE; ++j) {
+//                         int pixelX = x + j;
+//                         int pixelY = y + i;
+//                         if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+//                             pixels[pixelY * width + pixelX] = color;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+void mandelbrot(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, const std::vector<uint32_t>& colorPalette) {
+    int resolution = calculateResolution(scale);
+
+    std::vector<std::future<void>> futures;
+    int chunkSize = 64;
+    int numChunksX = (endX - startX + chunkSize - 1) / chunkSize;
+    int numChunksY = (endY - startY + chunkSize - 1) / chunkSize;
+
+    for (int chunkY = 0; chunkY < numChunksY; ++chunkY) {
+        for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {
+            int chunkStartX = startX + chunkX * chunkSize;
+            int chunkStartY = startY + chunkY * chunkSize;
+            int chunkEndX = std::min(chunkStartX + chunkSize, endX);
+            int chunkEndY = std::min(chunkStartY + chunkSize, endY);
+
+            futures.emplace_back(std::async(std::launch::async, [&, chunkStartX, chunkStartY, chunkEndX, chunkEndY]() {
+                for (int y = chunkStartY; y < chunkEndY; y += RENDER_SCALE) {
+                    for (int x = chunkStartX; x < chunkEndX; x += RENDER_SCALE) {
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            double zx = ((double)x - resolution / 2) * scale + centerX;
+                            double zy = ((double)y - resolution / 2) * scale + centerY;
+                            Complex c(zx, zy);
+                            Complex z(0, 0);
+                            int iterations = 0;
+                            while (std::abs(z) < 8 && iterations < MAX_ITERATIONS) {
+                                z = z * z + c;
+                                ++iterations;
+                            }
+
+                            uint32_t color = getColor(iterations, colorPalette);
+
+                            // Fill the scaled pixel block
+                            for (int i = 0; i < RENDER_SCALE; ++i) {
+                                for (int j = 0; j < RENDER_SCALE; ++j) {
+                                    int pixelX = x + j;
+                                    int pixelY = y + i;
+                                    if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+                                        pixels[pixelY * width + pixelX] = color;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
+            }));
         }
+    }
+
+    for (auto&& future : futures) {
+        future.get();
     }
 }
 
-void mandelbrot(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, const std::vector<uint32_t>& colorPalette) {
-    #pragma omp parallel for
-    for (int y = startY; y < endY; ++y) {
-        for (int x = startX; x < endX; ++x) {
-            if (x >= 0 && x < width && y >= 0 && y < height) {
-                Complex c((x - width / 2) * scale + centerX, (y - height / 2) * scale + centerY);
-                Complex z(0, 0);
-                int iterations = 0;
-                while (std::abs(z) < 8 && iterations < MAX_ITERATIONS) {
-                    z = z * z + c;
-                    ++iterations;
+void julia(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, int resolution, const std::vector<uint32_t>& colorPalette) {
+    Complex c(-0.8, 0.156);  // Julia set parameter
+
+    std::vector<std::future<void>> futures;
+    int chunkSize = 64;
+    int numChunksX = (endX - startX + chunkSize - 1) / chunkSize;
+    int numChunksY = (endY - startY + chunkSize - 1) / chunkSize;
+
+    for (int chunkY = 0; chunkY < numChunksY; ++chunkY) {
+        for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {
+            int chunkStartX = startX + chunkX * chunkSize;
+            int chunkStartY = startY + chunkY * chunkSize;
+            int chunkEndX = std::min(chunkStartX + chunkSize, endX);
+            int chunkEndY = std::min(chunkStartY + chunkSize, endY);
+
+            futures.emplace_back(std::async(std::launch::async, [&, chunkStartX, chunkStartY, chunkEndX, chunkEndY]() {
+                for (int y = chunkStartY; y < chunkEndY; y += RENDER_SCALE) {
+                    for (int x = chunkStartX; x < chunkEndX; x += RENDER_SCALE) {
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            double zx = ((double)x - resolution / 2) * scale + centerX;
+                            double zy = ((double)y - resolution / 2) * scale + centerY;
+                            Complex z(zx, zy);
+                            int iterations = 0;
+                            while (std::abs(z) < 10 && iterations < MAX_ITERATIONS) {
+                                z = z * z + c;
+                                ++iterations;
+                            }
+
+                            uint32_t color = getColor(iterations, colorPalette);
+
+                            // Fill the scaled pixel block
+                            for (int i = 0; i < RENDER_SCALE; ++i) {
+                                for (int j = 0; j < RENDER_SCALE; ++j) {
+                                    int pixelX = x + j;
+                                    int pixelY = y + i;
+                                    if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+                                        pixels[pixelY * width + pixelX] = color;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                uint32_t color = getColor(iterations, colorPalette);
-                pixels[y * width + x] = color;
-            }
+            }));
         }
+    }
+
+    for (auto&& future : futures) {
+        future.get();
     }
 }
 
