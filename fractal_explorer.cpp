@@ -7,13 +7,12 @@
 
 const int WIDTH = 1200;
 const int HEIGHT = 1000;
-const int MAX_ITERATIONS = 50;
+const int MAX_ITERATIONS = 70;
+const double RENDER_SCALE = 1;
 
 using Complex = std::complex<double>;
 
 int calculateResolution(double scale) {
-    // Adjust the resolution based on the zoom level (scale)
-    // You can customize this formula based on your requirements
     return static_cast<int>(WIDTH * scale);
 }
 
@@ -55,45 +54,56 @@ uint32_t getColor(int iterations, const std::vector<uint32_t>& colorPalette) {
     return (255 << 24) | (r << 16) | (g << 8) | b;
 }
 
-void continuousPotential(char* pixels, int width, int height, double minX, double maxX, double minY, double maxY, double scale, const std::vector<uint32_t>& colorPalette, bool isJulia, const Complex& c) {
+void julia(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, int resolution, const std::vector<uint32_t>& colorPalette) {
+    Complex c(-0.8, 0.156);  // Julia set parameter
+
     #pragma omp parallel for
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            double zx = minX + (maxX - minX) * x / width;
-            double zy = minY + (maxY - minY) * y / height;
-            Complex z(zx, zy);
-            int iterations = 0;
-            double potential = 0.0;
-            while (std::abs(z) < 2 && iterations < MAX_ITERATIONS) {
-                if (isJulia) {
+    for (int y = startY; y < endY; y += RENDER_SCALE) {
+        for (int x = startX; x < endX; x += RENDER_SCALE) {
+            if (x >= 0 && x < width && y >= 0 && y < height) {
+                double zx = ((double)x - resolution / 2) * scale + centerX;
+                double zy = ((double)y - resolution / 2) * scale + centerY;
+                Complex z(zx, zy);
+                int iterations = 0;
+                double potential = 0.0;
+
+                while (std::abs(z) < 10 && iterations < MAX_ITERATIONS) {
                     z = z * z + c;
-                } else {
                     potential = std::log(std::log(std::abs(z))) / std::log(2.0);
-                    z = z * z + Complex(zx, zy);
+                    ++iterations;
                 }
-                ++iterations;
-            }
-            if (iterations == MAX_ITERATIONS) {
-                uint32_t color = 0; // Set to black
-                memcpy(pixels + (y * width + x) * sizeof(uint32_t), &color, sizeof(uint32_t));
-            } else {
-                uint32_t color = getColor(static_cast<int>(potential * MAX_ITERATIONS), colorPalette);
-                memcpy(pixels + (y * width + x) * sizeof(uint32_t), &color, sizeof(uint32_t));
+
+                uint32_t color;
+                if (iterations == MAX_ITERATIONS) {
+                    color = 0x000000;  // Black color for points inside the set
+                } else {
+                    color = getColor(static_cast<int>(potential * MAX_ITERATIONS), colorPalette);
+                }
+
+                // Fill the scaled pixel block
+                for (int i = 0; i < RENDER_SCALE; ++i) {
+                    for (int j = 0; j < RENDER_SCALE; ++j) {
+                        int pixelX = x + j;
+                        int pixelY = y + i;
+                        if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+                            pixels[pixelY * width + pixelX] = color;
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-void julia(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, int resolution, const std::vector<uint32_t>& colorPalette) {
-    Complex c(-0.8, 0.156);  // Julia set parameter
-
+void mandelbrot(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, const std::vector<uint32_t>& colorPalette) {
     #pragma omp parallel for
     for (int y = startY; y < endY; ++y) {
         for (int x = startX; x < endX; ++x) {
             if (x >= 0 && x < width && y >= 0 && y < height) {
-                Complex z(((double)x - resolution / 2) * scale + centerX, ((double)y - resolution / 2) * scale + centerY);
+                Complex c((x - width / 2) * scale + centerX, (y - height / 2) * scale + centerY);
+                Complex z(0, 0);
                 int iterations = 0;
-                while (std::abs(z) < 2 && iterations < MAX_ITERATIONS) {
+                while (std::abs(z) < 8 && iterations < MAX_ITERATIONS) {
                     z = z * z + c;
                     ++iterations;
                 }
@@ -104,24 +114,14 @@ void julia(std::vector<uint32_t>& pixels, int width, int height, int startX, int
     }
 }
 
-void mandelbrot(char* pixels, int width, int height, double centerX, double centerY, double scale, const std::vector<uint32_t>& colorPalette) {
-    #pragma omp parallel for
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            Complex c((x - width / 2) * scale + centerX, (y - height / 2) * scale + centerY);
-            Complex z(0, 0);
-            int iterations = 0;
-            while (std::abs(z) < 2 && iterations < MAX_ITERATIONS) {
-                z = z * z + c;
-                ++iterations;
-            }
-            uint32_t color = getColor(iterations, colorPalette);
-            memcpy(pixels + (y * width + x) * sizeof(uint32_t), &color, sizeof(uint32_t));
-        }
+int main(int argc, char* argv[]) {
+    if (argc < 2 || argc > 3) {
+        std::cerr << "Usage: " << argv[0] << " <set_type> [num_colors]" << std::endl;
+        std::cerr << "  set_type: 'julia' or 'mandelbrot'" << std::endl;
+        std::cerr << "  num_colors: number of colors in the palette (default: 5)" << std::endl;
+        return 1;
     }
-}
 
-int main() {
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
     SDL_Texture* texture = nullptr;
@@ -158,13 +158,21 @@ int main() {
     bool quit = false;
     SDL_Event event;
 
-    double centerX = -0.5;
+    double centerX = 0.0;
     double centerY = 0.0;
-    double scale = 0.005;
+    double scale = 0.001;
 
-    const std::vector<uint32_t> colorPalette = generateRandomColorPalette(8);
+    std::string setType(argv[1]);
+    bool isJulia = (setType == "julia");
 
-    std::vector<char> pixels(WIDTH * HEIGHT);
+    int numColors = 5;
+    if (argc == 3) {
+        numColors = std::stoi(argv[2]);
+    }
+
+    const std::vector<uint32_t> colorPalette = generateRandomColorPalette(numColors);
+
+    std::vector<uint32_t> pixelBuffer(WIDTH * HEIGHT);
 
     while (!quit) {
         while (SDL_PollEvent(&event)) {
@@ -191,43 +199,47 @@ int main() {
                     case SDLK_MINUS:
                         scale /= 0.9;
                         break;
+                    case SDLK_j:
+                        isJulia = true;
+                        break;
+                    case SDLK_m:
+                        isJulia = false;
+                        break;
                     default:
                         break;
                 }
             }
         }
 
-        int resolution = calculateResolution(scale); // Adjust resolution based on zoom level
-    SDL_Rect visibleRegion = calculateVisibleRegion(centerX, centerY, scale, WIDTH, HEIGHT);
+        int resolution = calculateResolution(scale);
+        SDL_Rect visibleRegion = calculateVisibleRegion(centerX, centerY, scale, WIDTH, HEIGHT);
 
-    int chunkSize = 64; // Adjust chunk size as needed
-    int numChunksX = (visibleRegion.w + chunkSize - 1) / chunkSize;
-    int numChunksY = (visibleRegion.h + chunkSize - 1) / chunkSize;
+        int chunkSize = 64;
+        int numChunksX = (visibleRegion.w + chunkSize - 1) / chunkSize;
+        int numChunksY = (visibleRegion.h + chunkSize - 1) / chunkSize;
 
-    std::vector<uint32_t> pixelBuffer(WIDTH * HEIGHT);
+        #pragma omp parallel for
+        for (int chunkY = 0; chunkY < numChunksY; ++chunkY) {
+            for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {
+                int startX = std::max(0, visibleRegion.x + chunkX * chunkSize);
+                int startY = std::max(0, visibleRegion.y + chunkY * chunkSize);
+                int endX = std::min(startX + chunkSize, visibleRegion.x + visibleRegion.w);
+                int endY = std::min(startY + chunkSize, visibleRegion.y + visibleRegion.h);
 
-    #pragma omp parallel for
-    for (int chunkY = 0; chunkY < numChunksY; ++chunkY) {
-        for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {
-            int startX = std::max(0, visibleRegion.x + chunkX * chunkSize);
-            int startY = std::max(0, visibleRegion.y + chunkY * chunkSize);
-            int endX = std::min(startX + chunkSize, visibleRegion.x + visibleRegion.w);
-            int endY = std::min(startY + chunkSize, visibleRegion.y + visibleRegion.h);
+                if (isJulia) {
+                    julia(pixelBuffer, WIDTH, HEIGHT, startX, startY, endX, endY, centerX, centerY, scale, resolution, colorPalette);
+                } else {
+                    mandelbrot(pixelBuffer, WIDTH, HEIGHT, startX, startY, endX, endY, centerX, centerY, scale, colorPalette);
+                }
 
-            julia(pixelBuffer, WIDTH, HEIGHT, startX, startY, endX, endY, centerX, centerY, scale, resolution, colorPalette);
-
-            SDL_Rect chunkRect = { startX, startY, endX - startX, endY - startY };
-            SDL_UpdateTexture(texture, &chunkRect, &pixelBuffer[startY * WIDTH + startX], WIDTH * sizeof(uint32_t));
+                SDL_Rect chunkRect = { startX, startY, endX - startX, endY - startY };
+                SDL_UpdateTexture(texture, &chunkRect, &pixelBuffer[startY * WIDTH + startX], WIDTH * sizeof(uint32_t));
+            }
         }
-    }
 
-    // julia(reinterpret_cast<char*>(pixels.data()), WIDTH, HEIGHT, centerX, centerY, scale, colorPalette);
-    // or
-    // mandelbrot(reinterpret_cast<char*>(pixels.data()), WIDTH, HEIGHT, centerX, centerY, scale, colorPalette);
-
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-    SDL_RenderPresent(renderer);
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        SDL_RenderPresent(renderer);
     }
 
     SDL_DestroyTexture(texture);
