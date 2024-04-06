@@ -15,6 +15,7 @@
 #### - `<set_type>` is the type of fractal set to render, and can be one of the following:
 - `julia`: Renders the Julia set.
 - `mandelbrot`: Renders the Mandelbrot set.
+- `burningship`: Renders the Burningship set.
 
 #### - `[num_colors]` (optional) is the number of colors in the color palette. If not provided, the default value of 5 is used.
 
@@ -24,6 +25,7 @@
 - Press `-` to zoom out.
 - For the Julia set, press `j` to switch to the Julia set rendering.
 - For the Mandelbrot set, press `m` to switch to the Mandelbrot set rendering.
+- For the Burningship set, press `b` to switch to the Burningship set rendering.
 
 #### Additional Notes:
 - The fractal rendering is parallelized using OpenMP for improved performance.
@@ -35,7 +37,12 @@
 
 ### ![mandlebrot](https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/8e600ced-4bfd-4076-8755-b94f0dc0c944)
 
+#### Mandelbrot
 ### <img width="1199" alt="Screenshot 2024-04-05 at 11 11 58 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/b440f304-7579-4c04-b09e-1fc29aeddd00">
 
+#### Julia
 ### <img width="1200" alt="Screenshot 2024-04-05 at 10 42 25 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/f354e238-3030-4d91-9851-65333786a519">
+
+#### Burningship
+### <img width="1512" alt="Screenshot 2024-04-06 at 11 50 05 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/5035149f-21a9-42d7-9611-d7197587dac5">
 
