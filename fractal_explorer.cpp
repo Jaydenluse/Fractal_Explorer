@@ -8,10 +8,10 @@
 #include <thread>
 #include <vector>
 
-const int WIDTH = 1200;
+const int WIDTH = 1600;
 const int HEIGHT = 1000;
-const int MAX_ITERATIONS = 100;
-const double RENDER_SCALE = 2;
+const int MAX_ITERATIONS = 50;
+const double RENDER_SCALE = 1;
 
 using Complex = std::complex<double>;
 
@@ -237,13 +237,68 @@ void julia(std::vector<uint32_t>& pixels, int width, int height, int startX, int
     }
 }
 
+void burningShip(std::vector<uint32_t>& pixels, int width, int height, int startX, int startY, int endX, int endY, double centerX, double centerY, double scale, const std::vector<uint32_t>& colorPalette) {
+    int resolution = calculateResolution(scale);
+
+    std::vector<std::future<void>> futures;
+    int chunkSize = 64;
+    int numChunksX = (endX - startX + chunkSize - 1) / chunkSize;
+    int numChunksY = (endY - startY + chunkSize - 1) / chunkSize;
+
+    for (int chunkY = 0; chunkY < numChunksY; ++chunkY) {
+        for (int chunkX = 0; chunkX < numChunksX; ++chunkX) {
+            int chunkStartX = startX + chunkX * chunkSize;
+            int chunkStartY = startY + chunkY * chunkSize;
+            int chunkEndX = std::min(chunkStartX + chunkSize, endX);
+            int chunkEndY = std::min(chunkStartY + chunkSize, endY);
+
+            futures.emplace_back(std::async(std::launch::async, [&, chunkStartX, chunkStartY, chunkEndX, chunkEndY]() {
+                for (int y = chunkStartY; y < chunkEndY; y += RENDER_SCALE) {
+                    for (int x = chunkStartX; x < chunkEndX; x += RENDER_SCALE) {
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            double zx = ((double)x - resolution / 2) * scale + centerX;
+                            double zy = ((double)y - resolution / 2) * scale + centerY;
+                            Complex c(zx, zy);
+                            Complex z(0, 0);
+                            int iterations = 0;
+                            while (std::abs(z) < 8 && iterations < MAX_ITERATIONS) {
+                                double real = std::abs(z.real());
+                                double imag = std::abs(z.imag());
+                                z = Complex(real * real - imag * imag + c.real(), 2 * real * imag + c.imag());
+                                ++iterations;
+                            }
+
+                            uint32_t color = getColor(iterations, colorPalette);
+
+                            // Fill the scaled pixel block
+                            for (int i = 0; i < RENDER_SCALE; ++i) {
+                                for (int j = 0; j < RENDER_SCALE; ++j) {
+                                    int pixelX = x + j;
+                                    int pixelY = y + i;
+                                    if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+                                        pixels[pixelY * width + pixelX] = color;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }));
+        }
+    }
+
+    for (auto&& future : futures) {
+        future.get();
+    }
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 2 || argc > 3) {
         std::cerr << "Usage: " << argv[0] << " <set_type> [num_colors]" << std::endl;
-        std::cerr << "  set_type: 'julia' or 'mandelbrot'" << std::endl;
+        std::cerr << "  set_type: 'julia', 'mandelbrot', or 'burningship'" << std::endl;
         std::cerr << "  num_colors: number of colors in the palette (default: 5)" << std::endl;
         return 1;
-    }
+    }   
 
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
@@ -287,6 +342,7 @@ int main(int argc, char* argv[]) {
 
     std::string setType(argv[1]);
     bool isJulia = (setType == "julia");
+    bool isBurningShip = (setType == "burningship");
 
     int numColors = 5;
     if (argc == 3) {
@@ -324,9 +380,15 @@ int main(int argc, char* argv[]) {
                         break;
                     case SDLK_j:
                         isJulia = true;
+                        isBurningShip = false;
                         break;
                     case SDLK_m:
                         isJulia = false;
+                        isBurningShip = false;
+                        break;
+                    case SDLK_b:
+                        isJulia = false;
+                        isBurningShip = true;
                         break;
                     default:
                         break;
@@ -351,6 +413,8 @@ int main(int argc, char* argv[]) {
 
                 if (isJulia) {
                     julia(pixelBuffer, WIDTH, HEIGHT, startX, startY, endX, endY, centerX, centerY, scale, resolution, colorPalette);
+                } else if (isBurningShip) {
+                    burningShip(pixelBuffer, WIDTH, HEIGHT, startX, startY, endX, endY, centerX, centerY, scale, colorPalette);
                 } else {
                     mandelbrot(pixelBuffer, WIDTH, HEIGHT, startX, startY, endX, endY, centerX, centerY, scale, colorPalette);
                 }
