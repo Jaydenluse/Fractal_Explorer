@@ -44,5 +44,5 @@
 ### <img width="1200" alt="Screenshot 2024-04-05 at 10 42 25 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/f354e238-3030-4d91-9851-65333786a519">
 
 #### Burningship
+### <img width="1512" alt="Screenshot 2024-04-06 at 11 55 43 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/66d9e998-0204-472f-9783-7d7f12bd4116">
 ### <img width="1512" alt="Screenshot 2024-04-06 at 11 50 05 AM" src="https://github.com/Jaydenluse/Fractal_Explorer/assets/113644204/5035149f-21a9-42d7-9611-d7197587dac5">
-
