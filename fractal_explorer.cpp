@@ -8,10 +8,12 @@
 #include <thread>
 #include <vector>
 
+//See README for more information
+
 const int WIDTH = 1600;
 const int HEIGHT = 1000;
-const int MAX_ITERATIONS = 50;
-const double RENDER_SCALE = 1;
+const int MAX_ITERATIONS = 50; //This can be set higher or lower (at the cost of your CPU) for more iterations of the fractal
+const double RENDER_SCALE = 1; //This can also be set to a higher number for more performant CPU, but a lack of resolution
 
 using Complex = std::complex<double>;
 
